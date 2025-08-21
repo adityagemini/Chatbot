@@ -1,5 +1,6 @@
 import os
 import random
+import re
 from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
@@ -50,12 +51,53 @@ RESPONSES = {
         "Take care! Hope to chat again soon!",
         "Bye! Thanks for the conversation!",
         "Farewell! Wishing you all the best!"
+    ],
+    "incomprehensible": [
+        "Can't understand",
+        "I'm sorry, I can't understand what you're trying to say.",
+        "That doesn't seem to make sense to me. Can you try rephrasing?",
+        "I'm having trouble understanding that. Could you clarify?"
     ]
 }
+
+def is_incomprehensible(message):
+    """Check if the message is incoherent or incomprehensible"""
+    # Remove whitespace and convert to lowercase
+    cleaned_message = message.strip().lower()
+    
+    # Check if message is too short (less than 2 characters)
+    if len(cleaned_message) < 2:
+        return True
+    
+    # Check if message is mostly special characters or numbers
+    alphanumeric_chars = re.findall(r'[a-zA-Z0-9]', cleaned_message)
+    if len(alphanumeric_chars) / len(cleaned_message) < 0.3:
+        return True
+    
+    # Check for excessive repetition of characters (like "aaaaaaa" or "hehehehe")
+    if re.search(r'(.)\1{4,}', cleaned_message):
+        return True
+    
+    # Check for random character sequences (no vowels in a long word)
+    words = re.findall(r'[a-zA-Z]+', cleaned_message)
+    for word in words:
+        if len(word) > 4 and not re.search(r'[aeiouAEIOU]', word):
+            return True
+    
+    # Check for excessive special characters
+    special_char_count = len(re.findall(r'[^\w\s]', cleaned_message))
+    if special_char_count > len(cleaned_message) * 0.5:
+        return True
+    
+    return False
 
 def get_response(message):
     """Generate a response based on the user message"""
     message_lower = message.lower()
+    
+    # First check if the message is incomprehensible
+    if is_incomprehensible(message):
+        return random.choice(RESPONSES["incomprehensible"])
     
     # Check for greetings
     if any(word in message_lower for word in ['hello', 'hi', 'hey', 'greetings']):
